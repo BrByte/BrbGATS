@@ -49,14 +49,9 @@
 #include "DHT.h"
 
 #include <avr/wdt.h>
-
-/* simple define to organize code in one */
-// #define PDU_SYSTEM_COMPILE 1
-
 /**********************************************************************************************************************/
 /* DEFINES */
 /**********************************************************/
-
 // #define RESERVED    0 /* RX0 */
 // #define RESERVED    1 /* TX0 */
 #define GATS_ZEROCROSS_PIN 2 /* INT4 - PWM */
@@ -113,12 +108,38 @@
 #define TFT_CLK 52  /* PCINT1 - SCK */
 // #define RESERVED     53 /* PCINT0 - SS */
 
-#define SENSOR_VOLTAGE_DC_PIN A1
-#define SENSOR_VOLTAGE_AC_PIN A2
+#define SENSOR_DC_SUPPLY_01_IN_PIN A0
+// #define SENSOR_DC_SUPPLY_01_OUT_PIN A1
+// #define SENSOR_DC_SUPPLY_02_IN_PIN A2
+// #define SENSOR_DC_SUPPLY_02_OUT_PIN A3
 
-/* Minimal power to be considered online */
-#define GATS_TIMER_MIN_POWER 5.0
+#define SENSOR_AC_POWER_PIN A5
+// #define SENSOR_AC_AUX_PIN A6
+// #define SENSOR_AC_BAT_PIN A7
+/**********************************************************/
+#define GATS_EEPROM_OFFSET (BRB_RS485_EEPROM_OFFSET + 64)
 
+#define GATS_POWER_REVERSE 1
+
+#ifdef GATS_POWER_REVERSE
+#define GATS_POWER_ON LOW
+#define GATS_POWER_OFF HIGH
+#else
+#define GATS_POWER_ON HIGH
+#define GATS_POWER_OFF LOW
+#endif
+
+#define GATS_HOURMETER_MAX 20
+
+#define GATS_SERVO_BB_POS_OPEN 		180
+#define GATS_SERVO_BB_POS_CLOSE 	120
+
+#define GATS_POWER_MIN_VALUE 5
+#define GATS_POWER_MIN_HZ 10
+
+// #define GATS_AUX_MIN_VALUE 5
+// #define GATS_AUX_MIN_HZ 10
+/**********************************************************/
 #define GATS_TIMER_FAIL_ALARM_MS 5000
 
 #define GATS_TIMER_ZERO_WAIT_MS 2000
@@ -135,25 +156,22 @@
 
 #define GATS_TIMER_CHECK_MS 5000
 
-#define GATS_SERVO_BB_POS_OPEN 180
-#define GATS_SERVO_BB_POS_CLOSE 120
+#define GATS_TIMER_SENSOR_WAIT_MS 2000
+#define GATS_TIMER_SENSOR_SAMPLES 5
 
-#define GATS_HOURMETER_MAX 20
-
-#define GATS_POWER_REVERSE 1
-
-#ifdef GATS_POWER_REVERSE
-#define GATS_POWER_ON LOW
-#define GATS_POWER_OFF HIGH
-#else
-#define GATS_POWER_ON HIGH
-#define GATS_POWER_OFF LOW
-#endif
-
-#define GATS_EEPROM_OFFSET (BRB_RS485_EEPROM_OFFSET + 64)
+#define GATS_TIMER_DHT_MS 1000
 /**********************************************************************************************************************/
 /* ENUMS */
 /**********************************************************/
+typedef enum
+{
+	GATS_ACTION_NONE,
+	GATS_ACTION_START,
+	GATS_ACTION_STOP,
+	GATS_ACTION_CUT_FUEL
+	
+} BrbGATSActionCode;
+
 typedef enum
 {
 	GATS_FAILURE_NONE,
@@ -169,12 +187,13 @@ typedef enum
 typedef enum
 {
 	GATS_STATE_NONE,
+	GATS_STATE_FAILURE,
+	
 	GATS_STATE_START_INIT,
 	GATS_STATE_START_DELAY,
 	GATS_STATE_START_CHECK,
 
 	GATS_STATE_RUNNING,
-	GATS_STATE_FAILURE,
 
 	GATS_STATE_STOP_INIT,
 	GATS_STATE_STOP_DELAY,
@@ -209,7 +228,20 @@ typedef struct _BrbGATSBase
 		long last;
 		long delay;
 
+		long power_time;
+		long power_delay;
+
+		// long aux_time;
+		// long aux_delay;
+
 	} ms;
+
+	struct
+	{
+		long ms_delta;
+		long ms_last;
+
+	} sensor;
 
 	struct
 	{
@@ -276,8 +308,7 @@ int BrbGATSBase_Loop(BrbGATSBase *gats_base);
 int BrbGATSBase_Save(BrbGATSBase *gats_base);
 int BrbGATSBase_HourmeterReset(BrbGATSBase *gats_base);
 
-int BrbGATSBase_Start(BrbGATSBase *gats_base);
-int BrbGATSBase_Stop(BrbGATSBase *gats_base);
+int BrbGATSBase_ActionCmd(BrbGATSBase *gats_base, int cmd_code);
 
 int BrbGATSBase_FailureConfirm(BrbGATSBase *gats_base);
 
@@ -288,11 +319,11 @@ const char *BrbGATSBase_GetFailure(BrbGATSBase *gats_base);
 /**********************************************************************************************************************/
 /* Display */
 /**********************************************************/
-int BrbAppDisplay_Setup(BrbBase *brb_base);
+int BrbCtlDisplay_Setup(BrbBase *brb_base);
 /**********************************************************************************************************************/
 /* RS485 */
 /**********************************************************/
-int BrbAppRS485_Setup(BrbBase *brb_base);
+int BrbCtlRS485_Setup(BrbBase *brb_base);
 /**********************************************************************************************************************/
 /* Global control structures */
 extern BrbLogBase *glob_log_base;

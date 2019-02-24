@@ -104,10 +104,12 @@ void BrbGATSSetup(void)
     glob_gats_base.pin_parada = GATS_PARADA_PIN;
     glob_gats_base.pin_servo = GATS_SERVO_PIN;
     glob_gats_base.pin_extra = GATS_EXTRA_PIN;
+    
     glob_gats_base.zero_power.pin = GATS_ZEROCROSS_PIN;
 
-    glob_gats_base.sensor_power.pin = SENSOR_VOLTAGE_AC_PIN;
-    glob_gats_base.sensor_sp01_in.pin = SENSOR_VOLTAGE_DC_PIN;
+    glob_gats_base.sensor_sp01_in.pin = SENSOR_DC_SUPPLY_01_IN_PIN;
+    glob_gats_base.sensor_power.pin = SENSOR_AC_POWER_PIN;
+
     glob_gats_base.dht_data.pin = DHT_SENSOR_PIN;
     glob_gats_base.dht_data.type = DHT_SENSOR_TYPE;
 
@@ -126,7 +128,7 @@ void setup()
     BrbSetup();
 
     /* Setup Display before anything, because it can display some info, eg logs */
-    BrbAppDisplay_Setup(&glob_brb_base);
+    BrbCtlDisplay_Setup(&glob_brb_base);
 
     /* Setup Tone  */
     BrbToneSetup();
@@ -137,7 +139,7 @@ void setup()
     BrbGATSSetup();
 
     /* Setup RS485 Serial */
-    BrbAppRS485_Setup(&glob_brb_base);
+    BrbCtlRS485_Setup(&glob_brb_base);
 
     LOG_NOTICE(glob_log_base, "BrbBox Panel Control - START [%u] - 0.1.2\r\n", micros());
     LOG_NOTICE(glob_log_base, "BRB [%p], RS485 [%p]\r\n", &glob_brb_base, &glob_rs485_sess);

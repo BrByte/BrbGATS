@@ -61,12 +61,138 @@ int BrbGATSBase_Init(BrbGATSBase *gats_base)
 	digitalWrite(gats_base->pin_extra, GATS_POWER_OFF);
 
 	if (gats_base->sensor_power.pin > 0)
-		pinMode(gats_base->sensor_power.pin, INPUT_PULLUP);
+		pinMode(gats_base->sensor_power.pin, INPUT);
 
 	if (gats_base->sensor_sp01_in.pin > 0)
-		pinMode(gats_base->sensor_sp01_in.pin, INPUT_PULLUP);
+		pinMode(gats_base->sensor_sp01_in.pin, INPUT);
 
 	BrbServoSetPosByPin(gats_base->brb_base, gats_base->pin_servo, GATS_SERVO_BB_POS_OPEN);
+
+	return 0;
+}
+/**********************************************************************************************************************/
+int BrbGATSBase_DHTCheck(BrbGATSBase *gats_base)
+{
+	gats_base->dht_data.ms_delta = (gats_base->ms.cur - gats_base->dht_data.ms_last);
+
+	if ((gats_base->dht_sensor) && ((gats_base->dht_data.ms_last <= 0) || (gats_base->dht_data.ms_delta >= GATS_TIMER_DHT_MS)))
+	{
+		gats_base->dht_data.ms_last = gats_base->ms.cur;
+
+		gats_base->dht_data.dht_temp = gats_base->dht_sensor->readTemperature();
+		gats_base->dht_data.dht_humi = gats_base->dht_sensor->readHumidity();
+
+		/* Compute heat index in Celsius (isFahreheit = false) */
+		gats_base->dht_data.dht_hidx = gats_base->dht_sensor->computeHeatIndex(gats_base->dht_data.dht_temp, gats_base->dht_data.dht_humi, false);
+
+		gats_base->dht_data.dht_temp = isnan(gats_base->dht_data.dht_temp) ? 0.0 : gats_base->dht_data.dht_temp;
+		gats_base->dht_data.dht_humi = isnan(gats_base->dht_data.dht_humi) ? 0.0 : gats_base->dht_data.dht_humi;
+		gats_base->dht_data.dht_hidx = isnan(gats_base->dht_data.dht_hidx) ? 0.0 : gats_base->dht_data.dht_hidx;
+	}
+
+	return 0;
+}
+/**********************************************************************************************************************/
+int BrbGATSBase_SupplyCheck(BrbGATSBase *gats_base)
+{
+#define RDC1 30000.0
+#define RDC2 7500.0
+#define RDCR (RDC2 / (RDC2 + RDC1))
+
+	gats_base->sensor_sp01_in.value = ((analogRead(gats_base->sensor_sp01_in.pin) * 5.0) / 1024.0) / RDCR;
+	// gats_base->sensor_sp01_out.value = ((analogRead(gats_base->sensor_sp01_out.pin) * 5.0) / 1024.0) / RDCR;
+
+	// gats_base->sensor_sp02_in.value = ((analogRead(gats_base->sensor_sp02_in.pin) * 5.0) / 1024.0) / RDCR;
+	// gats_base->sensor_sp02_out.value = ((analogRead(gats_base->sensor_sp02_out.pin) * 5.0) / 1024.0) / RDCR;
+
+	return 0;
+}
+/**********************************************************************************************************************/
+int BrbGATSBase_PowerCheck(BrbGATSBase *gats_base)
+{
+	gats_base->zerocross.ms_delta = (gats_base->ms.cur - gats_base->zerocross.ms_last);
+	gats_base->zerocross.ms_delta = (gats_base->ms.cur - gats_base->zerocross.ms_last);
+
+	/* We are waiting delay */
+	if ((gats_base->zerocross.ms_last <= 0) || (gats_base->zerocross.ms_delta >= GATS_TIMER_ZERO_WAIT_MS))
+	{
+		gats_base->zerocross.ms_last = gats_base->ms.cur;
+
+		noInterrupts();
+		gats_base->zero_power.value = (gats_base->zero_power.counter / (gats_base->zerocross.ms_delta / 1000.0)) / 2.0;
+		gats_base->zero_power.counter = 0;
+
+		// gats_base->zero_aux.value = (gats_base->zero_aux.counter / (gats_base->zerocross.ms_delta / 1000.0)) / 2.0;
+		// gats_base->zero_aux.counter = 0;
+		interrupts();
+	}
+
+#define RAC1 220000.0
+#define RAC2 10000.0
+// #define RACR (RAC2 / (RAC2 + RAC1))
+#define RACR 0.0165
+
+	// gats_base->sensor_power.value = ((analogRead(gats_base->sensor_power.pin) * 5.0) / 1024.0) / 0.013;
+	gats_base->sensor.ms_delta = (gats_base->ms.cur - gats_base->sensor.ms_last);
+
+	/* We are waiting delay */
+	if ((gats_base->sensor.ms_last <= 0) || (gats_base->sensor.ms_delta >= GATS_TIMER_SENSOR_WAIT_MS))
+	{
+		gats_base->sensor.ms_last = gats_base->ms.cur;
+		long samples_value;
+		int i;
+
+		/* Read sensor data */
+		if (gats_base->sensor_power.pin > 0)
+		{
+			for (i = 0, samples_value = 0; i < GATS_TIMER_SENSOR_SAMPLES; i++)
+			{
+				samples_value += analogRead(gats_base->sensor_power.pin);
+			}
+
+			samples_value /= GATS_TIMER_SENSOR_SAMPLES;
+			gats_base->sensor_power.value = ((samples_value * 5.0) / 1023.0) / RACR;
+			// gats_base->sensor_power.value = ((analogRead(gats_base->sensor_power.pin) * 5.0) / 1023.0) / RACR;
+		}
+
+		// if (gats_base->sensor_aux.pin > 0)
+		// {
+		// 	for (i = 0, samples_value = 0; i < PDU_TIMER_SENSOR_SAMPLES; i++)
+		// 	{
+		// 		samples_value += analogRead(gats_base->sensor_aux.pin);
+		// 	}
+
+		// 	samples_value /= PDU_TIMER_SENSOR_SAMPLES;
+		// 	gats_base->sensor_aux.value = ((samples_value * 5.0) / 1023.0) / RACR;
+		// 	// gats_base->sensor_aux.value = ((analogRead(gats_base->sensor_aux.pin) * 5.0) / 1023.0) / RACR;
+		// }
+
+		if (gats_base->sensor_power.value > GATS_POWER_MIN_VALUE && gats_base->zero_power.value > GATS_POWER_MIN_HZ)
+		{
+			if (gats_base->ms.power_time <= 0)
+				gats_base->ms.power_time = gats_base->ms.cur;
+
+			gats_base->ms.power_delay = (gats_base->ms.cur - gats_base->ms.power_time);
+		}
+		else
+		{
+			gats_base->ms.power_delay = -1;
+			gats_base->ms.power_time = -1;
+		}
+
+		// if (gats_base->sensor_aux.value > GATS_AUX_MIN_VALUE && gats_base->zero_aux.value > GATS_AUX_MIN_HZ)
+		// {
+		// 	if (gats_base->ms.aux_time <= 0)
+		// 		gats_base->ms.aux_time = gats_base->ms.cur;
+
+		// 	gats_base->ms.aux_delay = (gats_base->ms.cur - gats_base->ms.aux_time);
+		// }
+		// else
+		// {
+		// 	gats_base->ms.aux_delay = -1;
+		// 	gats_base->ms.aux_time = -1;
+		// }
+	}
 
 	return 0;
 }
@@ -87,51 +213,18 @@ int BrbGATSBase_Loop(BrbGATSBase *gats_base)
 	gats_base->info.gas = random(750, 1000) / 10.0;
 	gats_base->info.load = random(250, 300) / 10.0;
 
-	gats_base->zerocross.ms_delta = (gats_base->ms.cur - gats_base->zerocross.ms_last);
+	BrbGATSBase_DHTCheck(gats_base);
 
-	/* We are waiting delay */
-	if ((gats_base->zerocross.ms_last <= 0) || (gats_base->zerocross.ms_delta >= GATS_TIMER_ZERO_WAIT_MS))
-	{
-		gats_base->zerocross.ms_last = gats_base->ms.cur;
+	BrbGATSBase_SupplyCheck(gats_base);
 
-		noInterrupts();
-		gats_base->zero_power.value = (gats_base->zero_power.counter / (gats_base->zerocross.ms_delta / 1000.0)) / 2.0;
-		gats_base->zero_power.counter = 0;
-		interrupts();
-	}
-
-	// LOG_NOTICE(gats_base->brb_base->log_base, "POWER [%02.01f] [%02.01f]\n", gats_base->sensor_power.value, gats_base->zero_power.value);
-
-#define RDC1 30000.0
-#define RDC2 7500.0
-#define RDCR (RDC2 / (RDC2 + RDC1))
-
-	gats_base->sensor_power.value = ((analogRead(gats_base->sensor_power.pin) * 5.0) / 1024.0) / 0.013;
-	gats_base->sensor_sp01_in.value = ((analogRead(gats_base->sensor_sp01_in.pin) * 5.0) / 1024.0) / RDCR;
-
-	gats_base->dht_data.ms_delta = (gats_base->ms.cur - gats_base->dht_data.ms_last);
-
-	if ((gats_base->dht_sensor) && ((gats_base->dht_data.ms_last <= 0) || (gats_base->dht_data.ms_delta >= 1000)))
-	{
-		gats_base->dht_data.ms_last = gats_base->ms.cur;
-
-		gats_base->dht_data.dht_temp = gats_base->dht_sensor->readTemperature();
-		gats_base->dht_data.dht_humi = gats_base->dht_sensor->readHumidity();
-
-		/* Compute heat index in Celsius (isFahreheit = false) */
-		gats_base->dht_data.dht_hidx = gats_base->dht_sensor->computeHeatIndex(gats_base->dht_data.dht_temp, gats_base->dht_data.dht_humi, false);
-
-		gats_base->dht_data.dht_temp = isnan(gats_base->dht_data.dht_temp) ? 0.0 : gats_base->dht_data.dht_temp;
-		gats_base->dht_data.dht_humi = isnan(gats_base->dht_data.dht_humi) ? 0.0 : gats_base->dht_data.dht_humi;
-		gats_base->dht_data.dht_hidx = isnan(gats_base->dht_data.dht_hidx) ? 0.0 : gats_base->dht_data.dht_hidx;
-	}
+	BrbGATSBase_PowerCheck(gats_base);
 
 	switch (gats_base->state.code)
 	{
 	case GATS_STATE_NONE:
 	{
 		/* This can't happen here, do something */
-		if (gats_base->sensor_power.value > GATS_TIMER_MIN_POWER && gats_base->zero_power.value > 30)
+		if (gats_base->sensor_power.value > GATS_POWER_MIN_VALUE && gats_base->zero_power.value > GATS_POWER_MIN_HZ)
 		{
 			BrbGATSBase_PowerSetState(gats_base, GATS_STATE_RUNNING, GATS_FAILURE_RUNNING_WITHOUT_START);
 
@@ -148,7 +241,7 @@ int BrbGATSBase_Loop(BrbGATSBase *gats_base)
 		BrbGATSBase_PowerOff(gats_base);
 
 		/* This can't happen here, do something */
-		if (gats_base->sensor_power.value > GATS_TIMER_MIN_POWER && gats_base->zero_power.value > 30)
+		if (gats_base->sensor_power.value > GATS_POWER_MIN_VALUE && gats_base->zero_power.value > GATS_POWER_MIN_HZ)
 		{
 			BrbGATSBase_PowerSetState(gats_base, GATS_STATE_RUNNING, GATS_FAILURE_RUNNING_WITHOUT_START);
 
@@ -170,7 +263,7 @@ int BrbGATSBase_Loop(BrbGATSBase *gats_base)
 	}
 	case GATS_STATE_START_DELAY:
 	{
-		if (gats_base->sensor_power.value > GATS_TIMER_MIN_POWER && gats_base->zero_power.value > 30)
+		if (gats_base->sensor_power.value > GATS_POWER_MIN_VALUE && gats_base->zero_power.value > GATS_POWER_MIN_HZ)
 		{
 			/* Power off pins */
 			BrbGATSBase_PowerOff(gats_base);
@@ -198,7 +291,7 @@ int BrbGATSBase_Loop(BrbGATSBase *gats_base)
 		/* Power off pins */
 		BrbGATSBase_PowerOff(gats_base);
 
-		if (gats_base->sensor_power.value > GATS_TIMER_MIN_POWER && gats_base->zero_power.value > 30)
+		if (gats_base->sensor_power.value > GATS_POWER_MIN_VALUE && gats_base->zero_power.value > GATS_POWER_MIN_HZ)
 		{
 			BrbGATSBase_PowerSetState(gats_base, GATS_STATE_RUNNING, GATS_FAILURE_NONE);
 
@@ -236,7 +329,7 @@ int BrbGATSBase_Loop(BrbGATSBase *gats_base)
 	}
 	case GATS_STATE_STOP_DELAY:
 	{
-		if (gats_base->sensor_power.value <= GATS_TIMER_MIN_POWER && gats_base->zero_power.value < 30)
+		if (gats_base->sensor_power.value <= GATS_POWER_MIN_VALUE && gats_base->zero_power.value < GATS_POWER_MIN_HZ)
 		{
 			/* Power off pins */
 			BrbGATSBase_PowerOff(gats_base);
@@ -264,7 +357,7 @@ int BrbGATSBase_Loop(BrbGATSBase *gats_base)
 		/* Power off pins */
 		BrbGATSBase_PowerOff(gats_base);
 
-		if (gats_base->sensor_power.value <= GATS_TIMER_MIN_POWER && gats_base->zero_power.value < 30)
+		if (gats_base->sensor_power.value <= GATS_POWER_MIN_VALUE && gats_base->zero_power.value < GATS_POWER_MIN_HZ)
 		{
 			BrbToneBase_PlayAlarm(gats_base->tone_base);
 
@@ -293,7 +386,7 @@ int BrbGATSBase_Loop(BrbGATSBase *gats_base)
 	case GATS_STATE_RUNNING:
 	{
 		/* Check Power */
-		if (gats_base->sensor_power.value < GATS_TIMER_MIN_POWER && gats_base->zero_power.value < 30)
+		if (gats_base->sensor_power.value < GATS_POWER_MIN_VALUE && gats_base->zero_power.value < GATS_POWER_MIN_HZ)
 		{
 			BrbGATSBase_PowerSetState(gats_base, GATS_STATE_FAILURE, GATS_FAILURE_DOWN_WITHOUT_STOP);
 
@@ -319,7 +412,7 @@ int BrbGATSBase_Loop(BrbGATSBase *gats_base)
 		{
 		case GATS_FAILURE_RUNNING_WITHOUT_START:
 		{
-			if (gats_base->sensor_power.value < GATS_TIMER_MIN_POWER && gats_base->zero_power.value < 30)
+			if (gats_base->sensor_power.value < GATS_POWER_MIN_VALUE && gats_base->zero_power.value < GATS_POWER_MIN_HZ)
 			{
 				BrbGATSBase_PowerSetState(gats_base, GATS_STATE_NONE, GATS_FAILURE_NONE);
 				break;
@@ -329,7 +422,7 @@ int BrbGATSBase_Loop(BrbGATSBase *gats_base)
 		}
 		case GATS_FAILURE_DOWN_WITHOUT_STOP:
 		{
-			if (gats_base->sensor_power.value >= GATS_TIMER_MIN_POWER && gats_base->zero_power.value > 30)
+			if (gats_base->sensor_power.value >= GATS_POWER_MIN_VALUE && gats_base->zero_power.value > GATS_POWER_MIN_HZ)
 			{
 				BrbGATSBase_PowerSetState(gats_base, GATS_STATE_NONE, GATS_FAILURE_NONE);
 				break;
@@ -339,7 +432,7 @@ int BrbGATSBase_Loop(BrbGATSBase *gats_base)
 		}
 		case GATS_FAILURE_START_RETRY_LIMIT:
 		{
-			if (gats_base->sensor_power.value >= GATS_TIMER_MIN_POWER && gats_base->zero_power.value > 30)
+			if (gats_base->sensor_power.value >= GATS_POWER_MIN_VALUE && gats_base->zero_power.value > GATS_POWER_MIN_HZ)
 			{
 				BrbGATSBase_PowerSetState(gats_base, GATS_STATE_NONE, GATS_FAILURE_NONE);
 				break;
@@ -349,7 +442,7 @@ int BrbGATSBase_Loop(BrbGATSBase *gats_base)
 		}
 		case GATS_FAILURE_STOP_RETRY_LIMIT:
 		{
-			if (gats_base->sensor_power.value < GATS_TIMER_MIN_POWER && gats_base->zero_power.value < 30)
+			if (gats_base->sensor_power.value < GATS_POWER_MIN_VALUE && gats_base->zero_power.value < GATS_POWER_MIN_HZ)
 			{
 				BrbGATSBase_PowerSetState(gats_base, GATS_STATE_NONE, GATS_FAILURE_NONE);
 				break;
@@ -363,15 +456,15 @@ int BrbGATSBase_Loop(BrbGATSBase *gats_base)
 			break;
 		}
 		}
-
-		/* Update time */
-		gats_base->state.time = gats_base->ms.cur;
+		
+		/* Reset failure */
+		BrbGATSBase_PowerSetState(gats_base, GATS_STATE_FAILURE, gats_base->state.fail);
 
 		break;
 	}
 	}
 
-	if (gats_base->sensor_power.value > GATS_TIMER_MIN_POWER)
+	if (gats_base->sensor_power.value > GATS_POWER_MIN_VALUE && gats_base->zero_power.value > GATS_POWER_MIN_HZ)
 	{
 		gats_base->info.hourmeter_ms = gats_base->info.hourmeter_ms + gats_base->ms.delay;
 
@@ -392,8 +485,6 @@ int BrbGATSBase_Loop(BrbGATSBase *gats_base)
 				BrbGATSBase_Save(gats_base);
 			}
 		}
-
-		// BrbGATSBase_PowerSetState(gats_base, GATS_STATE_RUNNING);
 	}
 
 	return 0;
@@ -446,34 +537,92 @@ static int BrbGATSBase_PowerOff(BrbGATSBase *gats_base)
 /**********************************************************************************************************************/
 static int BrbGATSBase_PowerSetState(BrbGATSBase *gats_base, BrbGATSStateCode code, BrbGATSFailureCode fail)
 {
-	// BrbBase *brb_base = gats_base->brb_base;
-
 	gats_base->state.delta = 0;
 	gats_base->state.code = code;
 	gats_base->state.fail = fail;
 	gats_base->state.time = gats_base->ms.cur;
+	
+	BrbRS485PacketVal rs485_pkt_val = {0};
+
+	if (code == GATS_STATE_FAILURE)
+	{
+		rs485_pkt_val.type = RS485_PKT_DATA_TYPE_NOTIFY;
+		rs485_pkt_val.code = fail;
+	}
+	else
+	{
+		rs485_pkt_val.type = RS485_PKT_DATA_TYPE_INFORM;
+		rs485_pkt_val.code = code;
+	}	
+
+	/* Send RS485 to notify the network */
+	BrbRS485Session_SendPacketData(&glob_rs485_sess, 0xFF, &rs485_pkt_val);
 
 	return 0;
 }
 /**********************************************************************************************************************/
-int BrbGATSBase_Start(BrbGATSBase *gats_base)
+int BrbGATSBase_ActionCmd(BrbGATSBase *gats_base, int cmd_code)
 {
-	// BrbBase *brb_base = gats_base->brb_base;
+	switch (cmd_code)
+	{
+		case GATS_ACTION_START:
+		{
+			switch (gats_base->state.code)
+			{
+			case GATS_STATE_START_INIT:
+			case GATS_STATE_START_DELAY:
+			case GATS_STATE_START_CHECK:
+			case GATS_STATE_RUNNING:
+			{
+				return 1;
+			}
+			case GATS_STATE_FAILURE:
+			case GATS_STATE_STOP_INIT:
+			case GATS_STATE_STOP_DELAY:
+			case GATS_STATE_STOP_CHECK:
+			case GATS_STATE_NONE:
+			default:			
+				BrbGATSBase_PowerSetState(gats_base, GATS_STATE_START_INIT, GATS_FAILURE_NONE);
 
-	BrbGATSBase_PowerSetState(gats_base, GATS_STATE_START_INIT, GATS_FAILURE_NONE);
+				BrbToneBase_PlayAction(gats_base->tone_base);
+				break;
+			}
 
-	BrbToneBase_PlayAction(gats_base->tone_base);
+			break;
+		}
+		case GATS_ACTION_STOP:
+		{
+			switch (gats_base->state.code)
+			{
+			case GATS_STATE_STOP_INIT:
+			case GATS_STATE_STOP_DELAY:
+			case GATS_STATE_STOP_CHECK:
+			{
+				return 1;
+			}
+			case GATS_STATE_START_INIT:
+			case GATS_STATE_START_DELAY:
+			case GATS_STATE_START_CHECK:
+			case GATS_STATE_RUNNING:
+			case GATS_STATE_FAILURE:
+			case GATS_STATE_NONE:
+			default:
+				BrbGATSBase_PowerSetState(gats_base, GATS_STATE_STOP_INIT, GATS_FAILURE_NONE);
 
-	return 0;
-}
-/**********************************************************************************************************************/
-int BrbGATSBase_Stop(BrbGATSBase *gats_base)
-{
-	// BrbBase *brb_base = gats_base->brb_base;
+				BrbToneBase_PlayAction(gats_base->tone_base);
+				break;
+			}
 
-	BrbGATSBase_PowerSetState(gats_base, GATS_STATE_STOP_INIT, GATS_FAILURE_NONE);
-
-	BrbToneBase_PlayAction(gats_base->tone_base);
+			break;
+		}
+		case GATS_ACTION_CUT_FUEL:
+		{
+			// BrbGATSBase_PowerStop(gats_base);
+			break;
+		}
+		default:
+			return -1;
+	}
 
 	return 0;
 }
