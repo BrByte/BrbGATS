@@ -581,7 +581,7 @@ int BrbGATSBase_ActionCmd(BrbGATSBase *gats_base, int cmd_code)
 			case GATS_STATE_STOP_DELAY:
 			case GATS_STATE_STOP_CHECK:
 			case GATS_STATE_NONE:
-			default:			
+			default:
 				BrbGATSBase_PowerSetState(gats_base, GATS_STATE_START_INIT, GATS_FAILURE_NONE);
 
 				BrbToneBase_PlayAction(gats_base->tone_base);
@@ -618,6 +618,13 @@ int BrbGATSBase_ActionCmd(BrbGATSBase *gats_base, int cmd_code)
 		case GATS_ACTION_CUT_FUEL:
 		{
 			// BrbGATSBase_PowerStop(gats_base);
+			break;
+		}
+		case GATS_ACTION_NONE:
+		{
+			BrbGATSBase_PowerSetState(gats_base, GATS_STATE_NONE, GATS_FAILURE_NONE);
+
+			BrbToneBase_PlayAction(gats_base->tone_base);
 			break;
 		}
 		default:
