@@ -220,92 +220,86 @@ int BrbCtlDisplay_ScreenControl(void *brb_base_ptr, void *display_base_ptr)
     BrbDisplayBase *display_base = (BrbDisplayBase *)display_base_ptr;
     BrbGATSBase *gats_base = (BrbGATSBase *)&glob_gats_base;
 
-    char sub_str[16] = {0};
-
     int pos_x;
     int pos_y;
 
+    const char *icon_ptr = NULL;
     const char *title_ptr = NULL;
     const char *text_ptr = NULL;
-
-    int retry_max = GATS_TIMER_START_RETRY_MAX;
     int color = ILI9341_ORANGERED;
 
-    if (display_base->screen_cur != display_base->screen_last)
-    {
-        BrbDisplayBase_SetBg(display_base);
-        BrbDisplayBase_SetTitle(display_base, PSTR("Controle"));
-    }
+    int retry_max = GATS_TIMER_START_RETRY_MAX;
+    // int color = ILI9341_ORANGERED;
 
     if (!display_base->flags.on_action && display_base->flags.on_select)
     {
         display_base->flags.on_action = 1;
         display_base->action_code = -1;
+        display_base->screen_last = -1;
     }
+
+    if (display_base->screen_cur != display_base->screen_last)
+    {
+        BrbDisplayBase_SetBg(display_base);
+        BrbDisplayBase_SetTitle(display_base, PSTR("Controle"));
+        display_base->tft->fillRect(DISPLAY_SZ_MARGIN, 89, 310, 1, ILI9341_WHITESMOKE);
+    }
+    
+    pos_x = DISPLAY_SZ_MARGIN;
+    pos_y = DISPLAY_SZ_TITLE_H + (DISPLAY_SZ_MARGIN * 2);
 
     switch (gats_base->state.code)
     {
     case GATS_STATE_START_INIT:
     {
         retry_max = GATS_TIMER_START_RETRY_MAX;
-        snprintf(sub_str, sizeof(sub_str) - 1, "%d s", (int)((GATS_TIMER_START_WAIT_MS - gats_base->state.delta) / 1000));
         color = ILI9341_ORANGERED;
         break;
     }
     case GATS_STATE_START_DELAY:
     {
         retry_max = GATS_TIMER_START_RETRY_MAX;
-        snprintf(sub_str, sizeof(sub_str) - 1, "%d s", (int)((GATS_TIMER_START_DELAY_MS - gats_base->state.delta) / 1000));
         color = ILI9341_ORANGERED;
         break;
     }
     case GATS_STATE_START_CHECK:
     {
         retry_max = GATS_TIMER_START_RETRY_MAX;
-        snprintf(sub_str, sizeof(sub_str) - 1, "%d s", (int)((GATS_TIMER_START_CHECK_MS - gats_base->state.delta) / 1000));
         color = ILI9341_ORANGERED;
         break;
     }
     case GATS_STATE_RUNNING:
     {
         retry_max = GATS_TIMER_START_RETRY_MAX;
-        long delta_minutes = (gats_base->state.delta / 1000) / 60;
-        snprintf(sub_str, sizeof(sub_str) - 1, "%dh%02dm", (int)(delta_minutes / 60), (int)(delta_minutes % 60));
         color = ILI9341_ORANGERED;
         break;
     }
     case GATS_STATE_FAILURE:
     {
         retry_max = GATS_TIMER_START_RETRY_MAX;
-        snprintf(sub_str, sizeof(sub_str) - 1, "%d s", (int)((gats_base->state.delta) / 1000));
         break;
     }
     case GATS_STATE_STOP_INIT:
     {
         retry_max = GATS_TIMER_STOP_RETRY_MAX;
-        snprintf(sub_str, sizeof(sub_str) - 1, "%d s", (int)((GATS_TIMER_STOP_CHECK_MS - gats_base->state.delta) / 1000));
         color = ILI9341_SEAGREEN;
         break;
     }
     case GATS_STATE_STOP_DELAY:
     {
         retry_max = GATS_TIMER_STOP_RETRY_MAX;
-        snprintf(sub_str, sizeof(sub_str) - 1, "%d s", (int)((GATS_TIMER_STOP_DELAY_MS - gats_base->state.delta) / 1000));
         color = ILI9341_SEAGREEN;
         break;
     }
     case GATS_STATE_STOP_CHECK:
     {
         retry_max = GATS_TIMER_STOP_RETRY_MAX;
-        snprintf(sub_str, sizeof(sub_str) - 1, "%d s", (int)((GATS_TIMER_STOP_CHECK_MS - gats_base->state.delta) / 1000));
         color = ILI9341_SEAGREEN;
         break;
     }
     case GATS_STATE_NONE:
     {
         retry_max = 0;
-        long delta_minutes = (gats_base->state.delta / 1000) / 60;
-        snprintf(sub_str, sizeof(sub_str) - 1, "%dh%02dm", (int)(delta_minutes / 60), (int)(delta_minutes % 60));
         color = ILI9341_SEAGREEN;
         break;
     }
@@ -315,7 +309,7 @@ int BrbCtlDisplay_ScreenControl(void *brb_base_ptr, void *display_base_ptr)
     }
     }
 
-    display_base->tft->fillRect(10, 50, 300, 60, ILI9341_WHITE);
+    display_base->tft->fillRect(DISPLAY_SZ_MARGIN, pos_y, 310, 49, DISPLAY_COLOR_BG);
 
     if (display_base->flags.on_action)
     {
@@ -344,19 +338,16 @@ int BrbCtlDisplay_ScreenControl(void *brb_base_ptr, void *display_base_ptr)
         //     text_ptr = BrbGATSBase_GetState(gats_base);
         // }
 
-        display_base->tft->setTextColor(ILI9341_BLACK, ILI9341_WHITE);
-        display_base->tft->setFont(DISPLAY_FONT_BOX_SUB);
-        display_base->tft->setTextScale(2);
-        display_base->tft->printAtPivoted(sub_str, 310, 50, gTextPivotTopRight);
+        // display_base->tft->setTextColor(ILI9341_BLACK, ILI9341_WHITE);
+        // display_base->tft->setFont(DISPLAY_FONT_BOX_SUB);
+        // display_base->tft->setTextScale(2);
 
-        sprintf(sub_str, "%d/%d", gats_base->state.retry, retry_max);
-        display_base->tft->printAtPivoted(sub_str, 310, 75, gTextPivotTopRight);
     }
 
     display_base->tft->setTextColor(color, ILI9341_WHITE);
     display_base->tft->setFont(DISPLAY_FONT_BOX_VALUE);
     display_base->tft->setTextScale(1);
-    display_base->tft->cursorToXY(10, 50);
+    display_base->tft->cursorToXY(DISPLAY_SZ_MARGIN, pos_y);
     display_base->tft->println((const __FlashStringHelper *)title_ptr);
 
     if (text_ptr)
@@ -364,23 +355,37 @@ int BrbCtlDisplay_ScreenControl(void *brb_base_ptr, void *display_base_ptr)
         display_base->tft->setTextColor(ILI9341_BLACK, ILI9341_WHITE);
         display_base->tft->setFont(DISPLAY_FONT_BOX_SUB);
         display_base->tft->setTextScale(1);
-        display_base->tft->cursorToXY(10, 80);
+        display_base->tft->cursorToXY(DISPLAY_SZ_MARGIN, pos_y + 35);
         display_base->tft->print((const __FlashStringHelper *)text_ptr);
-
-        // if (gats_base->state.fail > 0)
-        // {
-        //     display_base->tft->print(":");
-        //     display_base->tft->cursorToXY(display_base->tft->getCursorX() + 5, 80);
-        //     display_base->tft->println(gats_base->state.fail);
-        // }
     }
 
-    pos_x = 10;
-    pos_y = 110;
+    pos_x = DISPLAY_SZ_MARGIN;
+    pos_y = pos_y + 50;
 
-    BrbServo *servo_bb;
+    display_base->box.text_color = color;
+    display_base->tft->fillRect(pos_x, pos_y + DISPLAY_SZ_BOX_H, 320 - (DISPLAY_SZ_MARGIN * 2), 35, DISPLAY_COLOR_BG);
+    BrbDisplayBase_BoxUptime(display_base, pos_x, pos_y, PSTR("State"), ((millis() - gats_base->state.ms_change) / 1000));
 
-    servo_bb = BrbServoGrabByPin(gats_base->brb_base, gats_base->pin_servo);
+	if (display_base->screen_cur != display_base->screen_last)
+	{
+		BrbDisplayBase_BoxTitle(display_base, pos_x + 200, pos_y, PSTR("Retry"));
+	}
+
+    display_base->tft->setTextColor(color, DISPLAY_COLOR_BG);
+    display_base->tft->setFont(DISPLAY_FONT_BOX_VALUE);
+    display_base->tft->setTextScale(1);
+    display_base->tft->cursorToXY(pos_x + 200, pos_y + 12);    
+    char sub_str[16];
+    sprintf(sub_str, "%d/%d", gats_base->state.retry, retry_max);
+    display_base->tft->println(sub_str);
+    // display_base->tft->printAtPivoted(sub_str, 310, 75, gTextPivotTopRight);
+
+    pos_x = DISPLAY_SZ_MARGIN;
+    pos_y = pos_y + 50;
+
+    BrbMCUServo *servo_bb;
+
+    servo_bb = BrbMCUServoGrabByPin(&glob_servo_base, GATS_SERVO_PIN);
 
     display_base->tft->fillRect(pos_x, pos_y + 15, 300, 30, ILI9341_WHITE);
     BrbDisplayBase_BoxSub(display_base, pos_x, pos_y, PSTR("ENERGIA"), gats_base->sensor_power.value, 1, PSTR("VAC"));
@@ -431,24 +436,22 @@ int BrbCtlDisplay_ScreenControl(void *brb_base_ptr, void *display_base_ptr)
             display_base->user_int = 0;
             display_base->screen_last = -1;
 
-            BrbDisplayBase_ScreenAction(display_base, -1);
-
-            return 0;
+            return BrbDisplayBase_ScreenAction(display_base, -1);
         }
         else if ((display_base->action_code == DISPLAY_ACTION_NEXT) || (display_base->action_code == DISPLAY_ACTION_PREV))
         {
             display_base->user_int = !display_base->user_int;
         }
 
-        BrbDisplayBase_DrawBtn(display_base, 20, 170, 120, 60, PSTR("SIM"), display_base->user_int ? ILI9341_ORANGERED : ILI9341_LIGHTGREY, display_base->user_int ? ILI9341_WHITE : ILI9341_BLACK);
-        BrbDisplayBase_DrawBtn(display_base, 170, 170, 120, 60, PSTR("NAO"), !display_base->user_int ? ILI9341_ORANGERED : ILI9341_LIGHTGREY, !display_base->user_int ? ILI9341_WHITE : ILI9341_BLACK);
+        BrbDisplayBase_DrawBtn(display_base, 20, 180, 120, 55, PSTR("SIM"), display_base->user_int ? ILI9341_ORANGERED : ILI9341_LIGHTGREY, display_base->user_int ? ILI9341_WHITE : ILI9341_BLACK);
+        BrbDisplayBase_DrawBtn(display_base, 170, 180, 120, 55, PSTR("NAO"), !display_base->user_int ? ILI9341_ORANGERED : ILI9341_LIGHTGREY, !display_base->user_int ? ILI9341_WHITE : ILI9341_BLACK);
     }
     else
     {
 
         const char *btn_text_ptr = BrbGATSBase_GetStateButton(gats_base);
 
-        BrbDisplayBase_DrawBtn(display_base, 20, 170, 280, 60, btn_text_ptr, color, ILI9341_WHITE);
+        BrbDisplayBase_DrawBtn(display_base, 20, 180, 280, 55, btn_text_ptr, color, ILI9341_WHITE);
     }
 
     return 0;
@@ -557,25 +560,21 @@ int BrbCtlDisplay_ScreenCore(void *brb_base_ptr, void *display_base_ptr)
     display_base->tft->fillRect(pos_x, pos_y + DISPLAY_SZ_BOX_H, 310, 30, DISPLAY_COLOR_BG);
     display_base->box.text_color = ILI9341_MIDNIGHTBLUE;
     BrbDisplayBase_BoxUptime(display_base, pos_x, pos_y, PSTR("UpTime"), millis() / 1000);
-    BrbDisplayBase_BoxUptime(display_base, pos_x + 140, pos_y, PSTR("LifeTime"), brb_base->data.lifetime_sec);
+    BrbDisplayBase_BoxFmt(display_base, pos_x + 180, pos_y, PSTR("Memoria"), PSTR("%d"), BrbBase_FreeRAM());
 
     pos_x = DISPLAY_SZ_MARGIN;
-    pos_y = pos_y + 55;
+    pos_y = pos_y + 50;
 
     display_base->tft->fillRect(pos_x, pos_y + DISPLAY_SZ_BOX_H, 310, 30, DISPLAY_COLOR_BG);
-    BrbDisplayBase_BoxFmt(display_base, pos_x, pos_y, PSTR("Memoria"), PSTR("%d"), BrbBase_FreeRAM());
-    // BrbDisplayBase_BoxSub(display_base, pos_x + 160, pos_y, PSTR("Memoria"), BrbBase_FreeRAM(), 1, PSTR("%"));
+    BrbDisplayBase_BoxUptime(display_base, pos_x, pos_y, PSTR("LifeTime"), brb_base->data.lifetime_sec);
+    BrbDisplayBase_BoxFmt(display_base, pos_x + 180, pos_y, PSTR("UpCount"), PSTR("%d"), brb_base->data.upcount);
 
-    // pos_x = DISPLAY_SZ_MARGIN;
-    // pos_y = pos_y + 55;
+    pos_x = DISPLAY_SZ_MARGIN;
+    pos_y = pos_y + 50;
 
-    // display_base->tft->fillRect(pos_x, pos_y + DISPLAY_SZ_BOX_H, 310, 30, DISPLAY_COLOR_BG);
-    // BrbDisplayBase_BoxFmt(display_base, pos_x, pos_y, PSTR("RX/TX"), PSTR("%lu/%lu"), rs485_sess->stats.byte.rx, rs485_sess->stats.byte.tx);
-    // BrbDisplayBase_BoxUnit(display_base, pos_x, pos_y + DISPLAY_SZ_BOX_H, PSTR("KB"));
-
-    // BrbDisplayBase_BoxFmt(display_base, pos_x + 160, pos_y, PSTR("Error"), PSTR("%lu/%lu"),
-    //                       (rs485_sess->stats.err.bad_char + rs485_sess->stats.err.crc + rs485_sess->stats.err.overflow + rs485_sess->stats.err.pkt),
-    //                       (rs485_sess->stats.pkt.err.cmd_id + rs485_sess->stats.pkt.err.cmd_no_bcast + rs485_sess->stats.pkt.err.cmd_no_cb));
+    display_base->tft->fillRect(pos_x, pos_y + DISPLAY_SZ_BOX_H, 310, 30, DISPLAY_COLOR_BG);
+    BrbDisplayBase_BoxFmt(display_base, pos_x, pos_y, PSTR("Delay"), PSTR("%d"), brb_base->ms.delay);
+    BrbDisplayBase_BoxFmt(display_base, pos_x + 180, pos_y, PSTR("Loop"), PSTR("%ul"), brb_base->stats.loop_cnt);
 
     return 0;
 }
@@ -583,6 +582,7 @@ int BrbCtlDisplay_ScreenCore(void *brb_base_ptr, void *display_base_ptr)
 int BrbCtlDisplay_ScreenRS485(void *brb_base_ptr, void *display_base_ptr)
 {
     BrbDisplayBase *display_base = (BrbDisplayBase *)display_base_ptr;
+    BrbRS485Session *rs485_sess = (BrbRS485Session *)&glob_rs485_sess;
 
     int pos_x;
     int pos_y;
@@ -594,9 +594,6 @@ int BrbCtlDisplay_ScreenRS485(void *brb_base_ptr, void *display_base_ptr)
         display_base->tft->fillRect(DISPLAY_SZ_MARGIN, 89, 310, 1, ILI9341_WHITESMOKE);
     }
 
-    BrbBase *brb_base = (BrbBase *)brb_base_ptr;
-    BrbRS485Session *rs485_sess = (BrbRS485Session *)&glob_rs485_sess;
-
     pos_x = DISPLAY_SZ_MARGIN;
     pos_y = DISPLAY_SZ_TITLE_H + (DISPLAY_SZ_MARGIN * 2);
 
@@ -605,31 +602,34 @@ int BrbCtlDisplay_ScreenRS485(void *brb_base_ptr, void *display_base_ptr)
 
     display_base->tft->fillRect(pos_x, pos_y + DISPLAY_SZ_BOX_H, 310, 30, DISPLAY_COLOR_BG);
     BrbDisplayBase_BoxFmt(display_base, pos_x, pos_y, PSTR("UUID"), PSTR("%02x-%02x-%02x-%02x"), rs485_sess->data.uuid[0], rs485_sess->data.uuid[1], rs485_sess->data.uuid[2], rs485_sess->data.uuid[2]);
-    BrbDisplayBase_BoxFmt(display_base, pos_x + 190, pos_y, PSTR("ADDR"), PSTR("%02x"), rs485_sess->data.address);
+    BrbDisplayBase_BoxFmt(display_base, pos_x + 160, pos_y, PSTR("ADDR"), PSTR("%02x"), rs485_sess->data.address);
 
     pos_x = DISPLAY_SZ_MARGIN;
-    pos_y = pos_y + 55;
-
+    pos_y = pos_y + 50;
+    
     display_base->tft->fillRect(pos_x, pos_y + DISPLAY_SZ_BOX_H, 310, 30, DISPLAY_COLOR_BG);
-    BrbDisplayBase_BoxFmt(display_base, pos_x, pos_y, PSTR("Packet RX/TX"), PSTR("%lu/%lu"), rs485_sess->stats.pkt.rx, rs485_sess->stats.pkt.tx);
-    BrbDisplayBase_BoxFmt(display_base, pos_x + 130, pos_y, PSTR("Me"), PSTR("%lu"), rs485_sess->stats.pkt.me);
-    BrbDisplayBase_BoxFmt(display_base, pos_x + 190, pos_y, PSTR("Broadcast"), PSTR("%lu"), rs485_sess->stats.pkt.bcast);
-
-    pos_x = DISPLAY_SZ_MARGIN;
-    pos_y = pos_y + 55;
-    display_base->tft->fillRect(pos_x, pos_y + DISPLAY_SZ_BOX_H, 310, 30, DISPLAY_COLOR_BG);
-    //
-    // BrbDisplayBase_BoxFmt(display_base, pos_x + 190, pos_y, PSTR("Pkt Error"), PSTR("%lu/%lu/%lu"), rs485_sess->stats.pkt.err.cmd_id, rs485_sess->stats.pkt.err.cmd_no_bcast, rs485_sess->stats.pkt.err.cmd_no_cb);
-    // BrbDisplayBase_BoxFmt(display_base, pos_x + 190, pos_y, PSTR("Pkt Error"), PSTR("%lu/%lu/%lu"), rs485_sess->stats.pkt.err.cmd_id, rs485_sess->stats.pkt.err.cmd_no_bcast, rs485_sess->stats.pkt.err.cmd_no_cb);
 
     char byte_rx[16];
     char byte_tx[16];
 
-    dtostrf((double)(rs485_sess->stats.byte.rx / 1024.0), 5, 2, byte_rx);
-    dtostrf((double)(rs485_sess->stats.byte.tx / 1024.0), 5, 2, byte_tx);
+    dtostrf((double)(rs485_sess->stats.byte.rx / 1024.0), 3, 2, byte_rx);
+    dtostrf((double)(rs485_sess->stats.byte.tx / 1024.0), 3, 2, byte_tx);
 
-    BrbDisplayBase_BoxFmt(display_base, pos_x, pos_y, PSTR("Bytes RX/TX"), PSTR("%s/%s"), byte_rx, byte_tx);
-    BrbDisplayBase_BoxFmt(display_base, pos_x + 190, pos_y, PSTR("Error"), PSTR("%lu/%lu/%lu"), rs485_sess->stats.err.bad_char, rs485_sess->stats.err.crc, rs485_sess->stats.err.overflow);
+    BrbDisplayBase_BoxFmt(display_base, pos_x, pos_y, PSTR("Bytes RX"), PSTR("%s"), byte_rx);
+    BrbDisplayBase_BoxFmt(display_base, pos_x + 160, pos_y, PSTR("Bytes TX"), PSTR("%s"), byte_tx);
+
+    pos_x = DISPLAY_SZ_MARGIN;
+    pos_y = pos_y + 50;
+
+    display_base->tft->fillRect(pos_x, pos_y + DISPLAY_SZ_BOX_H, 310, 30, DISPLAY_COLOR_BG);
+    BrbDisplayBase_BoxFmt(display_base, pos_x, pos_y, PSTR("Packet RX/TX"), PSTR("%lu/%lu"), rs485_sess->stats.pkt.rx, rs485_sess->stats.pkt.tx);
+    BrbDisplayBase_BoxFmt(display_base, pos_x + 160, pos_y, PSTR("Me/Broad"), PSTR("%lu/%lu"), rs485_sess->stats.pkt.me, rs485_sess->stats.pkt.bcast);
+
+    pos_x = DISPLAY_SZ_MARGIN;
+    pos_y = pos_y + 50;
+    
+    BrbDisplayBase_BoxFmt(display_base, pos_x, pos_y, PSTR("Error"), PSTR("%lu/%lu/%lu"), rs485_sess->stats.err.bad_char, rs485_sess->stats.err.crc, rs485_sess->stats.err.overflow);
+    BrbDisplayBase_BoxFmt(display_base, pos_x + 160, pos_y, PSTR("Fail"), PSTR("%lu/%lu/%lu"), rs485_sess->stats.pkt.err.cmd_id, rs485_sess->stats.pkt.err.cmd_no_bcast, rs485_sess->stats.pkt.err.cmd_no_cb);
 
     return 0;
 }

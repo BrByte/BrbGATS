@@ -36,14 +36,16 @@
 /**********************************************************************************************************************/
 /* Import needed libraries */
 #include "Arduino.h"
-#include "BrbBase.h"
 
+#include "BrbMCUServoBase.h"
+
+#include "BrbBase.h"
 #include "BrbBtnBase.h"
 #include "BrbToneBase.h"
 
-#include <BrbDisplayBase.h>
 
-#include <BrbRS485Session.h>
+#include "BrbDisplayBase.h"
+#include "BrbRS485Session.h"
 
 #include "Adafruit_Sensor.h"
 #include "DHT.h"
@@ -56,9 +58,9 @@
 // #define RESERVED    1 /* TX0 */
 #define GATS_ZEROCROSS_PIN 2 /* INT4 - PWM */
 // #define RESERVED    3 /* INT5 - PWM */
-#define GATS_PARTIDA_PIN 4 /* PWM */
+#define GATS_STARTER_PIN 4 /* PWM */
 #define GATS_PARADA_PIN 5  /* PWM */
-#define GATS_EXTRA_PIN 6   /* PWM */
+#define GATS_SOLENOID_PIN 6   /* PWM */
 #define BUZZER_PIN 7          /* PWM */
 #define DHT_SENSOR_PIN 8      /* PWM */
 #define DHT_SENSOR_TYPE DHT11
@@ -119,7 +121,7 @@
 /**********************************************************/
 #define GATS_EEPROM_OFFSET (BRB_RS485_EEPROM_OFFSET + 64)
 
-#define GATS_POWER_REVERSE 1
+// #define GATS_POWER_REVERSE 1
 
 #ifdef GATS_POWER_REVERSE
 #define GATS_POWER_ON LOW
@@ -133,6 +135,8 @@
 
 #define GATS_SERVO_BB_POS_OPEN 		180
 #define GATS_SERVO_BB_POS_CLOSE 	120
+
+#define GATS_POWER_MIN_MS 3000
 
 #define GATS_POWER_MIN_VALUE 5
 #define GATS_POWER_MIN_HZ 10
@@ -150,8 +154,8 @@
 #define GATS_TIMER_START_CHECK_MS 15000
 #define GATS_TIMER_START_RETRY_MAX 3
 
-#define GATS_TIMER_STOP_DELAY_MS 10000
-#define GATS_TIMER_STOP_CHECK_MS 30000
+#define GATS_TIMER_STOP_DELAY_MS 15000
+#define GATS_TIMER_STOP_CHECK_MS 20000
 #define GATS_TIMER_STOP_RETRY_MAX 3
 
 #define GATS_TIMER_CHECK_MS 5000
@@ -211,11 +215,9 @@ typedef struct _BrbGATSBase
 
 	long delay;
 
-	int pin_servo;
-	int pin_partida;
-	int pin_parada;
-
-	int pin_extra;
+	// int pin_servo;
+	// int pin_partida;
+	// int pin_parada;
 
 	BrbZeroCross zero_power;
 	BrbSensorVoltage sensor_power;
@@ -231,6 +233,8 @@ typedef struct _BrbGATSBase
 		long power_time;
 		long power_delay;
 
+		long off_time;
+
 		// long aux_time;
 		// long aux_delay;
 
@@ -245,8 +249,8 @@ typedef struct _BrbGATSBase
 
 	struct
 	{
-		int ms_delta;
-		int ms_last;
+		long ms_delta;
+		long ms_last;
 
 	} zerocross;
 	
@@ -255,8 +259,10 @@ typedef struct _BrbGATSBase
 		float dht_temp;
 		float dht_humi;
 		float dht_hidx;
-		int ms_delta;
-		int ms_last;
+		
+		long ms_delta;
+		long ms_last;
+
 		uint8_t pin;
 		uint8_t type;
 	} dht_data;
@@ -266,8 +272,9 @@ typedef struct _BrbGATSBase
 		BrbGATSStateCode code;		
 		BrbGATSFailureCode fail;
 
-		long time;
-		long delta;
+		long ms_last;
+		long ms_change;
+		long ms_delta;
 		
 		int retry;
 
@@ -333,7 +340,7 @@ extern BrbRS485Session glob_rs485_sess;
 extern BrbBtnBase glob_btn_base;
 extern BrbDisplayBase glob_display_base;
 extern BrbToneBase glob_tone_base;
-
+extern BrbMCUServoBase glob_servo_base;
 extern BrbGATSBase glob_gats_base;
 /**********************************************************************************************************************/
 #endif /* MAIN_H_ */

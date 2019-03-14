@@ -42,6 +42,8 @@ BrbBtnBase glob_btn_base;
 BrbDisplayBase glob_display_base;
 BrbToneBase glob_tone_base;
 
+BrbMCUServoBase glob_servo_base;
+
 BrbGATSBase glob_gats_base;
 /**********************************************************************************************************************/
 /* RUN ONE TIME ON START */
@@ -82,7 +84,6 @@ void BrbToneSetup(void)
     memset(&glob_tone_base, 0, sizeof(BrbToneBase));
 
     glob_tone_base.pin = BUZZER_PIN;
-    glob_tone_base.brb_base = &glob_brb_base;
     BrbToneBase_Init(&glob_tone_base);
 
     return;
@@ -96,14 +97,18 @@ static void BrbGATSBase_ZeroCrossPower()
 void BrbGATSSetup(void)
 {
     /* Clean up base */
+    memset(&glob_servo_base, 0, sizeof(BrbMCUServoBase));
+    
+    BrbMCUServoBase_Init(&glob_servo_base);
+
+    /* Clean up base */
     memset(&glob_gats_base, 0, sizeof(BrbGATSBase));
 
     glob_gats_base.brb_base = (BrbBase *)&glob_brb_base;
     glob_gats_base.tone_base = (BrbToneBase *)&glob_tone_base;
-    glob_gats_base.pin_partida = GATS_PARTIDA_PIN;
-    glob_gats_base.pin_parada = GATS_PARADA_PIN;
-    glob_gats_base.pin_servo = GATS_SERVO_PIN;
-    glob_gats_base.pin_extra = GATS_EXTRA_PIN;
+    // glob_gats_base.pin_partida = GATS_PARTIDA_PIN;
+    // glob_gats_base.pin_parada = GATS_PARADA_PIN;
+    // glob_gats_base.pin_servo = GATS_SERVO_PIN;
     
     glob_gats_base.zero_power.pin = GATS_ZEROCROSS_PIN;
 
