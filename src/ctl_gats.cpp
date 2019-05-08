@@ -168,7 +168,7 @@ int BrbGATSBase_PowerCheck(BrbGATSBase *gats_base)
 		// 	// gats_base->sensor_aux.value = ((analogRead(gats_base->sensor_aux.pin) * 5.0) / 1023.0) / RACR;
 		// }
 
-		if (gats_base->sensor_power.value > GATS_POWER_MIN_VALUE && gats_base->zero_power.value > GATS_POWER_MIN_HZ)
+		if (gats_base->sensor_power.value > GATS_POWER_MIN_VALUE || gats_base->zero_power.value > GATS_POWER_MIN_HZ)
 		{
 			if (gats_base->ms.power_time <= 0)
 				gats_base->ms.power_time = gats_base->ms.cur;
@@ -228,6 +228,9 @@ int BrbGATSBase_Loop(BrbGATSBase *gats_base)
 		/* This can't happen here, do something */
 		if (gats_base->ms.power_delay > GATS_POWER_MIN_MS)
 		{
+		  /* Power off pins */
+		  BrbGATSBase_PowerOff(gats_base);
+
 			BrbGATSBase_PowerSetState(gats_base, GATS_STATE_RUNNING, GATS_FAILURE_RUNNING_WITHOUT_START);
 
 			BrbToneBase_PlayArrive(gats_base->tone_base);
@@ -244,6 +247,9 @@ int BrbGATSBase_Loop(BrbGATSBase *gats_base)
 
 		if (gats_base->ms.power_delay > GATS_POWER_MIN_MS)
 		{
+		  /* Power off pins */
+		  BrbGATSBase_PowerOff(gats_base);
+
 			BrbToneBase_PlayArrive(gats_base->tone_base);
 
 			BrbGATSBase_PowerSetState(gats_base, GATS_STATE_RUNNING, GATS_FAILURE_RUNNING_WITHOUT_START);
@@ -368,7 +374,12 @@ int BrbGATSBase_Loop(BrbGATSBase *gats_base)
 			break;
 
 		if (gats_base->ms.power_delay < 1000 && ((gats_base->ms.cur - gats_base->ms.off_time) > 5000))
+    {
+		  /* Power off pins */
+		  BrbGATSBase_PowerOff(gats_base);
+      
 			return BrbGATSBase_PowerSetState(gats_base, GATS_STATE_NONE, GATS_FAILURE_NONE);
+    }
 		
 		if (gats_base->state.retry >= (GATS_TIMER_START_RETRY_MAX * 2))
 			return BrbGATSBase_PowerSetState(gats_base, GATS_STATE_FAILURE, GATS_FAILURE_STOP_RETRY_LIMIT);
