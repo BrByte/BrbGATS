@@ -75,6 +75,10 @@ void BrbBtnSetup(void)
 
     BrbBtnBase_Init(&glob_btn_base);
 
+    attachInterrupt(digitalPinToInterrupt(14), BrbAppBase_BtnNext, FALLING);
+    attachInterrupt(digitalPinToInterrupt(13), BrbAppBase_BtnPrev, FALLING);
+    attachInterrupt(digitalPinToInterrupt(12), BrbAppBase_BtnSelect, FALLING);
+
     return;
 }
 /**********************************************************************************************************************/
@@ -162,8 +166,8 @@ void loop()
     /* Dispatch */
     BrbBaseLoop(&glob_brb_base);
     
-    /* Check for Buttons */
-    BrbBtnBase_Loop((BrbBtnBase *)&glob_btn_base);
+    // /* Check for Buttons */
+    // BrbBtnBase_Loop((BrbBtnBase *)&glob_btn_base);
 
     if (glob_btn_base.buttons[BRB_BTN_SELECT].hit > 0)
     {
